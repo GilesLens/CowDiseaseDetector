@@ -7,13 +7,43 @@
 </head>
 <body>
     <h1>Image Disease Predictor</h1>
-    <input type="file" id="imageUpload" accept="image/*">
+
+    <!-- Image Upload Input -->
+    <input type="file" id="imageUpload" accept="image/*" onchange="previewImage()">
+    
+    <!-- Preview Uploaded Image -->
+    <div>
+        <h3>Uploaded Image:</h3>
+        <img id="preview" src="" alt="Uploaded Image" style="max-width: 300px; display: none;">
+    </div>
+
+    <!-- Predict Button -->
     <button onclick="predict()">Predict</button>
+
+    <!-- Display Prediction Result -->
     <h3 id="result"></h3>
 
     <script>
+        // Function to preview the uploaded image
+        function previewImage() {
+            let fileInput = document.getElementById("imageUpload");
+            let preview = document.getElementById("preview");
+
+            if (fileInput.files && fileInput.files[0]) {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = "block";  // Show the image
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            }
+        }
+
+        // Function to send image to FastAPI and get prediction
         async function predict() {
             let fileInput = document.getElementById("imageUpload");
+            let resultText = document.getElementById("result");
+
             if (fileInput.files.length === 0) {
                 alert("Please select an image!");
                 return;
@@ -29,16 +59,87 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+                    throw new Error("Failed to get prediction.");
                 }
 
                 let data = await response.json();
-                console.log("Prediction:", data.prediction);  // Debugging
-                document.getElementById("result").innerText = "Prediction: " + data.prediction;
-
+                resultText.innerText = "Prediction: " + data.prediction;
             } catch (error) {
                 console.error("Error:", error);
-                document.getElementById("result").innerText = "Error: Unable to fetch prediction.";
+                resultText.innerText = "Error: Unable to fetch prediction.";
+            }
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Prediction</title>
+</head>
+<body>
+    <h1>Image Disease Predictor</h1>
+
+    <!-- Image Upload Input -->
+    <input type="file" id="imageUpload" accept="image/*" onchange="previewImage()">
+    
+    <!-- Preview Uploaded Image -->
+    <div>
+        <h3>Uploaded Image:</h3>
+        <img id="preview" src="" alt="Uploaded Image" style="max-width: 300px; display: none;">
+    </div>
+
+    <!-- Predict Button -->
+    <button onclick="predict()">Predict</button>
+
+    <!-- Display Prediction Result -->
+    <h3 id="result"></h3>
+
+    <script>
+        // Function to preview the uploaded image
+        function previewImage() {
+            let fileInput = document.getElementById("imageUpload");
+            let preview = document.getElementById("preview");
+
+            if (fileInput.files && fileInput.files[0]) {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = "block";  // Show the image
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            }
+        }
+
+        // Function to send image to FastAPI and get prediction
+        async function predict() {
+            let fileInput = document.getElementById("imageUpload");
+            let resultText = document.getElementById("result");
+
+            if (fileInput.files.length === 0) {
+                alert("Please select an image!");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                let response = await fetch("https://mldeployment-7873.onrender.com/", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to get prediction.");
+                }
+
+                let data = await response.json();
+                resultText.innerText = "Prediction: " + data.prediction;
+            } catch (error) {
+                console.error("Error:", error);
+                resultText.innerText = "Error: Unable to fetch prediction.";
             }
         }
     </script>
