@@ -1,8 +1,12 @@
-from fastapi import FastAPI, File, UploadFile
+import os
+import uvicorn
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import tensorflow as tf
+from starlette.responses import JSONResponse
+from fastapi import UploadFile, File
 import numpy as np
 import cv2
+import tensorflow as tf
 
 path = "C:\\Users\\gilbe\\ML Deployment\\BaseModel.keras"
 
@@ -46,3 +50,8 @@ async def predict(file: UploadFile = File(...)):
     label = "Lumpy Cow (1)" if prediction > 0.5 else "Healthy Cow (0)"
     
     return {"prediction": label}
+
+# Main entry point for Render
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))  # Use Render's PORT or default to 8000
+    uvicorn.run(app, host="0.0.0.0", port=port)
