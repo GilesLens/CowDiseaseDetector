@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Prediction</title>
+</head>
+<body>
+    <h1>Image Disease Predictor</h1>
+    <input type="file" id="imageUpload" accept="image/*">
+    <button onclick="predict()">Predict</button>
+    <h3 id="result"></h3>
+
+    <script>
+        async function predict() {
+            let fileInput = document.getElementById("imageUpload");
+            if (fileInput.files.length === 0) {
+                alert("Please select an image!");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                let response = await fetch("http://127.0.0.1:8000/predict", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                let data = await response.json();
+                console.log("Prediction:", data.prediction);  // Debugging
+                document.getElementById("result").innerText = "Prediction: " + data.prediction;
+
+            } catch (error) {
+                console.error("Error:", error);
+                document.getElementById("result").innerText = "Error: Unable to fetch prediction.";
+            }
+        }
+    </script>
+</body>
+</html>
