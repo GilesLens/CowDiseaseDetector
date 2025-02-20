@@ -41,6 +41,8 @@ def preprocess_image(image_bytes):
     return image
 
 # Serve HTML Page
+templates = Jinja2Templates(directory="templates")  
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
