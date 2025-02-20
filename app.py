@@ -1,11 +1,13 @@
 import os
 import uvicorn
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
 import numpy as np
 import cv2
 import tensorflow as tf
+from fastapi import FastAPI, UploadFile, File, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from starlette.responses import JSONResponse
 
 # Force TensorFlow to use CPU (Prevents cuBLAS issues)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -38,21 +40,20 @@ def preprocess_image(image_bytes):
     image = np.expand_dims(image, axis=0)  # Add batch dimension
     return image
 
-@app.get("/")
-def home():
-    return {"message": "Welcome to the Prediction API!"}
+# Serve HTML Page
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     try:
         image = await file.read()
         processed_image = preprocess_image(image)
-        
         prediction = model.predict(processed_image)
         label = "Lumpy Cow (1)" if prediction > 0.5 else "Healthy Cow (0)"
-        
         return {"prediction": label}
-    
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
