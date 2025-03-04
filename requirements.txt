@@ -2,6 +2,7 @@ fastapi
 uvicorn
 jinja2
 tensorflow
+ultralytics==8.0.162
 numpy
 opencv-python
 python-multipart

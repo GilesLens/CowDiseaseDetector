@@ -1,65 +1,162 @@
 import os
 import uvicorn
-import numpy as np
 import cv2
-import tensorflow as tf
-from fastapi import FastAPI, UploadFile, File, Request
+import numpy as np
+import csv
+from ultralytics import YOLO
+from fastapi import FastAPI, UploadFile, File, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from starlette.responses import JSONResponse
+import matplotlib.pyplot as plt
 
-# Force TensorFlow to use CPU (Prevents cuBLAS issues)
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-# Path to the model (Modify if using Render)
-MODEL_PATH = "BaseModel.keras"
-
-# Load the trained model
-model = tf.keras.models.load_model(MODEL_PATH)
-
-# Initialize FastAPI app
 app = FastAPI()
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows requests from any frontend (for development)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Function to preprocess image
+# Load YOLOv8
+model = YOLO("yolov8n.pt")
+
+# ========== HELPER FUNCTIONS ==========
+
 def preprocess_image(image_bytes):
     image = np.frombuffer(image_bytes, np.uint8)
-    image = cv2.imdecode(image, cv2.IMREAD_GRAYSCALE)  # Load as grayscale
-    image = cv2.resize(image, (224, 224))  # Resize
-    image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)  # Convert grayscale to RGB
-    image = image / 255.0  # Normalize
-    image = np.expand_dims(image, axis=0)  # Add batch dimension
-    return image
+    return cv2.imdecode(image, cv2.IMREAD_COLOR)
 
-# Serve HTML Page
-templates = Jinja2Templates(directory="templates")  
+def save_to_csv(data_list):
+    csv_file = "lesion_metadata_log.csv"
+    fieldnames = [
+        "image_file", "x1", "y1", "x2", "y2", "confidence", "stage",
+        "cause", "onset", "texture", "color", "itching", "rain_exposure"
+    ]
+    file_exists = os.path.isfile(csv_file)
+
+    with open(csv_file, mode="a", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        for data in data_list:
+            writer.writerow(data)
+
+# ========== 1: PREDICT ENDPOINT ==========
+
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    image_bytes = await file.read()
+    img = preprocess_image(image_bytes)
+
+    results = model(img, conf=0.3)
+    all_bboxes = []
+
+    for result in results:
+        boxes = result.boxes.xyxy.numpy()
+        scores = result.boxes.conf.numpy()
+
+        for i, box in enumerate(boxes):
+            x1, y1, x2, y2 = map(int, box)
+            confidence = scores[i]
+
+            stage = "Severe" if confidence > 0.8 else "Moderate" if confidence > 0.5 else "Mild"
+
+            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(img, f"{stage} ({confidence:.2f})", (x1, y1-10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+
+            all_bboxes.append({
+                "image_file": file.filename,
+                "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+                "confidence": confidence, "stage": stage
+            })
+
+    if len(all_bboxes) == 0:
+        return {"status": "healthy", "message": f"No lumps detected for {file.filename}"}
+
+    # Save detection results for follow-up metadata collection
+    with open("detection_results.csv", mode="w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=all_bboxes[0].keys())
+        writer.writeheader()
+        writer.writerows(all_bboxes)
+
+    return {"status": "lumpy", "message": f"{len(all_bboxes)} lumps detected", "file": file.filename}
+
+# ========== 2: METADATA COLLECTION ENDPOINT ==========
+
+@app.post("/collect-metadata")
+async def collect_metadata(
+    image_file: str = Form(...),
+    cause: str = Form(...),
+    onset: str = Form(...),
+    texture: str = Form(...),
+    color: str = Form(...),
+    itching: str = Form(...),
+    rain_exposure: str = Form(...)
+):
+    metadata = {
+        "cause": cause,
+        "onset": onset,
+        "texture": texture,
+        "color": color,
+        "itching": itching,
+        "rain_exposure": rain_exposure
+    }
+
+    # Load previous detection results and enrich with metadata
+    enriched_data = []
+    with open("detection_results.csv", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row["image_file"] == image_file:
+                row.update(metadata)
+                enriched_data.append(row)
+
+    save_to_csv(enriched_data)
+    return {"status": "metadata saved", "file": image_file}
+
+# ========== 3: DIAGNOSIS ENDPOINT ==========
+
+@app.get("/diagnose")
+def diagnose():
+    diagnoses = []
+    with open("lesion_metadata_log.csv", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row["cause"] == "1":
+                diagnosis = "Tick-borne"
+            elif row["cause"] == "2":
+                diagnosis = "Viral (possible Bovine Herpes or Pseudocowpox)"
+            elif row["cause"] == "3":
+                diagnosis = "Fungal (possible Ringworm)"
+            elif row["cause"] == "4":
+                diagnosis = "Allergy or Hypersensitivity"
+            elif row["rain_exposure"] == "1":
+                diagnosis = "Rain scald (Dermatophilosis)"
+            else:
+                diagnosis = "Other (requires further investigation)"
+
+            diagnoses.append({
+                "image_file": row["image_file"],
+                "x1": row["x1"], "y1": row["y1"],
+                "diagnosis": diagnosis
+            })
+
+    return {"diagnoses": diagnoses}
+
+# ========== 4: SERVE HTML (Optional) ==========
+
+templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+# ========== MAIN ==========
 
-@app.post("/predict")
-async def predict(file: UploadFile = File(...)):
-    try:
-        image = await file.read()
-        processed_image = preprocess_image(image)
-        prediction = model.predict(processed_image)
-        label = "Lumpy Cow (1)" if prediction > 0.5 else "Healthy Cow (0)"
-        return {"prediction": label}
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
-
-# Main entry point for Render
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))  # Use Render's PORT or default to 8000
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
