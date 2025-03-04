@@ -73,7 +73,7 @@
             formData.append("file", fileInput.files[0]);
 
             try {
-                let response = await fetch("https://mldeployment-7873.onrender.com/predict", {
+                let response = await fetch("https://cowdiseasedetector.onrender.com", {
                     method: "POST",
                     body: formData
                 });
@@ -91,7 +91,7 @@
                     resultText.innerText = `Lumpy Cow: ${data.message}`;
                     // In a real-world setup, the backend should return the processed image with bounding boxes
                     // If the backend saves the processed image as /static/annotated/<filename>, this works:
-                    annotatedImage.src = `https://mldeployment-7873.onrender.com/static/annotated/${uploadedFileName}`;
+                    annotatedImage.src = `https://cowdiseasedetector.onrender.com/static/annotated/${uploadedFileName}`;
                     annotatedImage.style.display = "block";
                 }
 
