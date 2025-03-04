@@ -1,9 +1,20 @@
-</html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Prediction</title>
+    <style>
+        img {
+            max-width: 100%;
+            max-height: 500px;
+            margin: 10px 0;
+        }
+        #resultSection {
+            display: none;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
     <h1>Image Disease Predictor</h1>
@@ -14,35 +25,44 @@
     <!-- Preview Uploaded Image -->
     <div>
         <h3>Uploaded Image:</h3>
-        <img id="preview" src="" alt="Uploaded Image" style="max-width: 1280px; display: none;">
+        <img id="preview" src="" alt="Uploaded Image" style="display: none;">
     </div>
 
     <!-- Predict Button -->
     <button onclick="predict()">Predict</button>
 
-    <!-- Display Prediction Result -->
-    <h3 id="result"></h3>
+    <!-- Section to show results (only after prediction) -->
+    <div id="resultSection">
+        <h3>Prediction Result:</h3>
+        <p id="result"></p>
+
+        <h3>Processed Image with Detection:</h3>
+        <img id="annotatedImage" alt="Processed Image">
+    </div>
 
     <script>
-        // Function to preview the uploaded image
+        let uploadedFileName = "";
+
         function previewImage() {
             let fileInput = document.getElementById("imageUpload");
             let preview = document.getElementById("preview");
 
             if (fileInput.files && fileInput.files[0]) {
+                uploadedFileName = fileInput.files[0].name;
                 let reader = new FileReader();
                 reader.onload = function(e) {
                     preview.src = e.target.result;
-                    preview.style.display = "block";  // Show the image
+                    preview.style.display = "block";
                 };
                 reader.readAsDataURL(fileInput.files[0]);
             }
         }
 
-        // Function to send image to FastAPI and get prediction
         async function predict() {
             let fileInput = document.getElementById("imageUpload");
             let resultText = document.getElementById("result");
+            let resultSection = document.getElementById("resultSection");
+            let annotatedImage = document.getElementById("annotatedImage");
 
             if (fileInput.files.length === 0) {
                 alert("Please select an image!");
@@ -63,10 +83,23 @@
                 }
 
                 let data = await response.json();
-                resultText.innerText = "Prediction: " + data.prediction;
+
+                if (data.status === "healthy") {
+                    resultText.innerText = "Healthy Cow: No lumps detected.";
+                    annotatedImage.style.display = "none";
+                } else {
+                    resultText.innerText = `Lumpy Cow: ${data.message}`;
+                    // In a real-world setup, the backend should return the processed image with bounding boxes
+                    // If the backend saves the processed image as /static/annotated/<filename>, this works:
+                    annotatedImage.src = `https://mldeployment-7873.onrender.com/static/annotated/${uploadedFileName}`;
+                    annotatedImage.style.display = "block";
+                }
+
+                resultSection.style.display = "block";  // Reveal result section
             } catch (error) {
                 console.error("Error:", error);
                 resultText.innerText = "Error: Unable to fetch prediction.";
+                resultSection.style.display = "block";
             }
         }
     </script>
