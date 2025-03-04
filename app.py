@@ -26,7 +26,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # YOLOv8 model (make sure 'yolov8n.pt' is in the same folder as app.py)
-model = YOLO("yolov8n.pt")
+model = YOLO("yolov8n.pt") 
 
 # Templating for frontend (like your index.html)
 templates = Jinja2Templates(directory="templates")
