@@ -4,3 +4,4 @@ ultralytics
 opencv-python-headless
 matplotlib
 torch==2.5.1
+python-multipart
