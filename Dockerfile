@@ -1,20 +1,11 @@
-# Use an official Python runtime as a parent image
-FROM python:3.11
+FROM python:3.11-slim
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt .
+COPY . /app
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y libgl1 libglib2.0-0
 
-# Copy the entire project into the container
-COPY . .
+RUN pip install -r requirements.txt
 
-# Expose the port FastAPI will run on
-EXPOSE 8000
-
-# Run the FastAPI application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
