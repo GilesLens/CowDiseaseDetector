@@ -25,31 +25,78 @@
     <!-- Preview Uploaded Image -->
     <div>
         <h3>Uploaded Image:</h3>
-        <img id="preview" src="" alt="Uploaded Image" style="display: none;">
+        <img id="preview" src="" alt="Uploaded Image" style="display: none; max-width: 600px;">
     </div>
-
+    
     <!-- Predict Button -->
     <button onclick="predict()">Predict</button>
-
-    <!-- Section to show results (only after prediction) -->
-    <div id="resultSection">
+    
+    <!-- Result Section -->
+    <div id="resultSection" style="display: none;">
         <h3>Prediction Result:</h3>
         <p id="result"></p>
-
+    
         <h3>Processed Image with Detection:</h3>
-        <img id="annotatedImage" alt="Processed Image">
+        <img id="annotatedImage" alt="Processed Image" style="display: none; max-width: 600px;">
     </div>
-
+    
+    <!-- Observation Form (only shows if lumps are detected) -->
+    <div id="observationForm" style="display: none;">
+        <h3>Observation Form (Please fill in to diagnose)</h3>
+    
+        <label>How fast did the lumps appear?</label>
+        <select id="onset">
+            <option value="1">Sudden</option>
+            <option value="2">Gradual</option>
+        </select><br>
+    
+        <label>What texture are the lumps?</label>
+        <select id="texture">
+            <option value="1">Raised & Firm</option>
+            <option value="2">Flat & Scaly</option>
+            <option value="3">Papules</option>
+            <option value="4">Blisters</option>
+        </select><br>
+    
+        <label>What color are the lumps?</label>
+        <select id="color">
+            <option value="1">Red</option>
+            <option value="2">Grey</option>
+            <option value="3">Bald (Alopecic)</option>
+            <option value="4">Other</option>
+        </select><br>
+    
+        <label>Are the lumps itchy?</label>
+        <select id="itching">
+            <option value="1">Yes</option>
+            <option value="2">No</option>
+        </select><br>
+    
+        <label>Was the cow exposed to heavy rain recently?</label>
+        <select id="rain_exposure">
+            <option value="1">Yes</option>
+            <option value="2">No</option>
+        </select><br>
+    
+        <button onclick="submitObservation()">Submit Observations</button>
+    </div>
+    
+    <!-- Final Diagnosis Result -->
+    <div id="diagnosisSection" style="display: none;">
+        <h3>Diagnosis:</h3>
+        <p id="diagnosisResult"></p>
+    </div>
+    
     <script>
         let uploadedFileName = "";
-
+    
         function previewImage() {
-            let fileInput = document.getElementById("imageUpload");
-            let preview = document.getElementById("preview");
-
+            const fileInput = document.getElementById("imageUpload");
+            const preview = document.getElementById("preview");
+            uploadedFileName = fileInput.files[0].name;  // Capture file name right away
+    
             if (fileInput.files && fileInput.files[0]) {
-                uploadedFileName = fileInput.files[0].name;
-                let reader = new FileReader();
+                const reader = new FileReader();
                 reader.onload = function(e) {
                     preview.src = e.target.result;
                     preview.style.display = "block";
@@ -57,49 +104,103 @@
                 reader.readAsDataURL(fileInput.files[0]);
             }
         }
-
+    
         async function predict() {
-            let fileInput = document.getElementById("imageUpload");
-            let resultText = document.getElementById("result");
-            let resultSection = document.getElementById("resultSection");
-            let annotatedImage = document.getElementById("annotatedImage");
-
+            const fileInput = document.getElementById("imageUpload");
+            const resultText = document.getElementById("result");
+            const annotatedImage = document.getElementById("annotatedImage");
+            const resultSection = document.getElementById("resultSection");
+            const observationForm = document.getElementById("observationForm");
+            const diagnosisSection = document.getElementById("diagnosisSection");
+    
+            resultSection.style.display = "none";
+            observationForm.style.display = "none";
+            diagnosisSection.style.display = "none";
+    
             if (fileInput.files.length === 0) {
                 alert("Please select an image!");
                 return;
             }
-
-            let formData = new FormData();
+    
+            const formData = new FormData();
             formData.append("file", fileInput.files[0]);
-
+    
             try {
-                let response = await fetch("https://cowdiseasedetector.onrender.com/predict", {
+                const response = await fetch("https://cowdiseasedetector.onrender.com/predict", {
                     method: "POST",
                     body: formData
                 });
-
-                if (!response.ok) {
-                    throw new Error("Failed to get prediction.");
-                }
-
-                let data = await response.json();
-
+    
+                if (!response.ok) throw new Error("Failed to get prediction.");
+    
+                const data = await response.json();
+    
                 if (data.status === "healthy") {
-                    resultText.innerText = "Healthy Cow: No lumps detected.";
+                    resultText.innerText = "✅ Healthy Cow: No lumps detected.";
                     annotatedImage.style.display = "none";
+                    observationForm.style.display = "none";
                 } else {
-                    resultText.innerText = `Lumpy Cow: ${data.message}`;
-                    // In a real-world setup, the backend should return the processed image with bounding boxes
-                    // If the backend saves the processed image as /static/annotated/<filename>, this works:
-                    annotatedImage.src = `https://cowdiseasedetector.onrender.com/static/annotated/${uploadedFileName}`;
+                    resultText.innerText = `⚠️ Lumpy Cow: ${data.message}`;
+                    annotatedImage.src = `https://cowdiseasedetector.onrender.com/static/annotated/${uploadedFileName}?t=${Date.now()}`;
                     annotatedImage.style.display = "block";
+                    observationForm.style.display = "block";  // Show form if lumps detected
                 }
-
-                resultSection.style.display = "block";  // Reveal result section
-            } catch (error) {
-                console.error("Error:", error);
-                resultText.innerText = "Error: Unable to fetch prediction.";
+    
                 resultSection.style.display = "block";
+            } catch (error) {
+                console.error("Prediction failed:", error);
+                resultText.innerText = "❌ Error: Unable to fetch prediction.";
+                resultSection.style.display = "block";
+            }
+        }
+    
+        async function submitObservation() {
+            const formData = new FormData();
+            formData.append("image_file", uploadedFileName);
+            formData.append("onset", document.getElementById("onset").value);
+            formData.append("texture", document.getElementById("texture").value);
+            formData.append("color", document.getElementById("color").value);
+            formData.append("itching", document.getElementById("itching").value);
+            formData.append("rain_exposure", document.getElementById("rain_exposure").value);
+    
+            try {
+                const response = await fetch("https://cowdiseasedetector.onrender.com/collect-metadata", {
+                    method: "POST",
+                    body: formData
+                });
+    
+                if (!response.ok) throw new Error("Failed to submit observation.");
+    
+                await fetchDiagnosis();  // Once metadata submitted, trigger diagnosis
+            } catch (error) {
+                alert("❌ Failed to submit observation data!");
+                console.error(error);
+            }
+        }
+    
+        async function fetchDiagnosis() {
+            try {
+                const response = await fetch("https://cowdiseasedetector.onrender.com/diagnose");
+    
+                if (!response.ok) throw new Error("Failed to fetch diagnosis.");
+    
+                const data = await response.json();
+                const diagnosisResult = document.getElementById("diagnosisResult");
+                const diagnosisSection = document.getElementById("diagnosisSection");
+    
+                // Find the diagnosis for the current image
+                const diagnosis = data.diagnoses.find(d => d.image_file === uploadedFileName);
+    
+                if (diagnosis) {
+                    diagnosisResult.innerText = `🔎 Diagnosis: ${diagnosis.diagnosis}`;
+                } else {
+                    diagnosisResult.innerText = "❓ Diagnosis not found for this image.";
+                }
+    
+                diagnosisSection.style.display = "block";
+            } catch (error) {
+                alert("❌ Failed to fetch diagnosis!");
+                console.error(error);
             }
         }
     </script>
