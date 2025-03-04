@@ -1,8 +1,6 @@
 fastapi
 uvicorn
-jinja2
-tensorflow
-ultralytics==8.0.162
-numpy
-opencv-python
-python-multipart
+ultralytics
+opencv-python-headless
+matplotlib
+torch==2.5.1
