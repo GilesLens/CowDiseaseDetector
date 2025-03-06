@@ -87,6 +87,33 @@
         <p id="diagnosisResult"></p>
     </div>
     
+    <style>
+        .progress-bar {
+            display: none;
+            width: 100%;
+            height: 5px;
+            background-color: #f0f0f0;
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-bar span {
+            display: block;
+            height: 100%;
+            background-color: #4caf50;
+            width: 0;
+            animation: loading 2s linear infinite;
+        }
+        @keyframes loading {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+    </style>
+    
+    <!-- Progress bar for prediction -->
+    <div class="progress-bar" id="predictionProgress">
+        <span></span>
+    </div>
+
     <script>
         let uploadedFileName = "";
     
@@ -112,13 +139,16 @@
             const resultSection = document.getElementById("resultSection");
             const observationForm = document.getElementById("observationForm");
             const diagnosisSection = document.getElementById("diagnosisSection");
+            const predictionProgress = document.getElementById("predictionProgress");
     
             resultSection.style.display = "none";
             observationForm.style.display = "none";
             diagnosisSection.style.display = "none";
+            predictionProgress.style.display = "block"; 
     
             if (fileInput.files.length === 0) {
                 alert("Please select an image!");
+                predictionProgress.style.display = "none";
                 return;
             }
     
@@ -130,6 +160,8 @@
                     method: "POST",
                     body: formData
                 });
+
+                predictionProgress.style.display = "none";
     
                 if (!response.ok) throw new Error("Failed to get prediction.");
     
